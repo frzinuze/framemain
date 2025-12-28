@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>MAINFRAME</title>
+<style>
+html,body{margin:0;background:black;overflow:hidden;font-family:Courier New,monospace}
+canvas{display:block}
+#overlay,#end{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:black;color:#00ff00;z-index:10
+}
+#gate{text-align:center;animation:pulse 3s infinite}
+#gate div{font-size:12px;letter-spacing:3px;opacity:.7}
+#enter{
+  margin:20px;
+  background:black;color:#00ff00;
+  border:2px solid #00ff00;
+  padding:18px 40px;
+  font-size:20px;letter-spacing:4px;
+  cursor:pointer;
+  box-shadow:0 0 20px #00ff00
+}
+#end{
+  display:none;font-size:32px;letter-spacing:6px;animation:flicker .15s infinite;
+}
+@keyframes pulse{50%{transform:scale(1.03)}}
+@keyframes flicker{50%{opacity:.4}}
+</style>
+</head>
+
+<body>
+<div id="overlay">
+  <div id="gate">
+    <div>UNAUTHORIZED ACCESS DETECTED</div>
+    <button id="enter">ENTER MAINFRAME</button>
+    <div>ALL ACTIVITY MONITORED</div>
+  </div>
+</div>
+
+<div id="end"></div>
+<canvas id="c"></canvas>
+
+<script>
+const c=document.getElementById("c"),x=c.getContext("2d");
+const overlay=document.getElementById("overlay");
+const enter=document.getElementById("enter");
+const end=document.getElementById("end");
+
+let w,h,fs=16,cols,rows,grid=[];
+let frame=0,trace=0,freeze=0,trust=false;
+let buffer="";
+
+// Messages
+const safeMessages=[
+"TRACE INITIATED","YOU ARE NOT THE FIRST",
+"THEY LEFT THIS FOR YOU","FIND THE SEQUENCE",
+"OBSERVATION MODE ACTIVE"
+];
+
+const eerieMessages=[
+"THEY ARE WATCHING","ERROR: UNAUTHORIZED PRESENCE",
+"SYSTEM COMPROMISED","TRACE COMPLETE",
+"DISCONNECT IMMEDIATELY","YOUR PRESENCE IS LOGGED",
+"WARNING: ESCALATING ALERT","YOU SHOULD NOT BE HERE",
+"THE GRID KNOWS"
+];
+
+// Ghostly faces (ASCII style)
+const faces=[
+["  █   █  ","    █    "," █     █ ","   ███   "],
+[" ░░█░░ ","█     █"," ░ ░ ░ "," ████  "],
+["  █ ░ █ "," ░ █ ░ "," █   █ ","  ███  "]
+];
+
+function resize(){
+  w=c.width=innerWidth;
+  h=c.height=innerHeight;
+  cols=Math.floor(w/fs);
+  rows=Math.floor(h/fs);
+  grid=Array.from({length:rows},()=>Array.from({length:cols},()=>Math.random()*10|0));
+}
+
+function mutate(){
+  for(let i=0;i<2000;i++){
+    grid[Math.floor(Math.random()*rows)][Math.floor(Math.random()*cols)]=Math.random()*10|0;
+  }
+
+  // Insert occasional binary clue
+  if(Math.random()<0.002){
+    const clue=["0","1","1","0"];
+    const r=Math.floor(Math.random()*rows);
+    clue.forEach((v,i)=>grid[r][10+i]=v);
+  }
+
+  // Insert ghostly face randomly
+  if(Math.random()<0.0005){
+    const face=faces[Math.floor(Math.random()*faces.length)];
+    const rStart=Math.floor(Math.random()*(rows-face.length));
+    const cStart=Math.floor(Math.random()*(cols-face[0].length));
+    face.forEach((row,i)=>{
+      for(let j=0;j<row.length;j++){
+        grid[rStart+i][cStart+j]=row[j];
+      }
+    });
+    freeze=30; // brief freeze
+  }
+
+  // Replace row with creepy symbols occasionally
+  if(Math.random()<0.001){
+    const symbols=["█","░","▒","▓","■"];
+    const r=Math.floor(Math.random()*rows);
+    for(let i=0;i<cols;i++){
+      grid[r][i]=symbols[Math.floor(Math.random()*symbols.length)];
+    }
+  }
+}
+
+function draw(){
+  if(freeze>0){freeze--;return;}
+  x.fillStyle="black";x.fillRect(0,0,w,h);
+  x.font=fs+"px Courier New";x.textBaseline="top";
+
+  for(let r=0;r<rows;r++){
+    for(let c0=0;c0<cols;c0++){
+      let flick=Math.random()*50;
+      x.fillStyle=`rgb(0,${150+flick},0)`;
+      x.fillText(grid[r][c0],c0*fs,r*fs);
+    }
+  }
+
+  // Red flash if trace rises
+  if(trace>1 && Math.random()<0.05){
+    x.fillStyle="rgba(255,0,0,0.15)";
+    x.fillRect(0,0,w,h);
+  }
+
+  // Messages escalate with trace
+  if(Math.random()<0.02){
+    let msgSet = trace>3 ? eerieMessages : safeMessages;
+    x.fillStyle="#00ff00";
+    x.fillText(msgSet[Math.floor(Math.random()*msgSet.length)],20,40+Math.random()*h*0.7);
+  }
+
+  // Glitch effect
+  if(Math.random()<0.25){
+    let y=Math.random()*h;
+    x.drawImage(c,0,y,w,25,(Math.random()*20)-10,y,w,25);
+  }
+
+  // Canvas shake as trace rises
+  if(trace>4){
+    let dx=(Math.random()-0.5)*10;
+    let dy=(Math.random()-0.5)*10;
+    x.setTransform(1,0,0,1,dx,dy);
+  } else {
+    x.setTransform(1,0,0,1,0,0);
+  }
+}
+
+function loop(){
+  frame++;
+  mutate(); draw();
+  if(!trust && frame%400===0) trace++;
+  if(trace>6 && !trust) endSession("fail");
+  requestAnimationFrame(loop);
+}
+
+function endSession(type){
+  document.exitFullscreen();
+  freeze=9999;
+  if(type==="fail"){
+    end.style.color="red";
+    end.textContent="CONNECTION TERMINATED";
+  } else if(type==="safe"){
+    end.style.color="#00ff00";
+    end.textContent="DISCONNECTING SAFELY...";
+  }
+  end.style.display="flex";
+  setTimeout(()=>location.reload(),3500);
+}
+
+function message(txt){
+  x.fillStyle="#00ff00";
+  x.fillText(txt,w/2-txt.length*4,h/2);
+  freeze=50;
+}
+
+// ENTER BUTTON
+enter.onclick=()=>{
+  document.documentElement.requestFullscreen();
+  overlay.remove();
+  resize();
+  loop();
+};
+
+addEventListener("resize",resize);
+
+// KEYBOARD HANDLING
+addEventListener("keydown",e=>{
+  if(e.key.length===1){
+    buffer+=(e.key.toUpperCase());
+    if(buffer.length>20) buffer=buffer.slice(-20);
+  }
+
+  // Trust / Safe exit
+  if(buffer.includes("LISTEN")){
+    trust=true;
+    message("GOOD. YOU'RE LISTENING.");
+  }
+  if(buffer.includes("WAKE UP")){
+    message("THIS IS A TEST.");
+  }
+  if(buffer.includes("EXIT SAFE")){
+    trust=true;
+    message("DISCONNECTING SAFELY...");
+    setTimeout(()=>endSession("safe"),1000);
+  }
+
+  // Scary / fear escalation
+  if(buffer.includes("TRUST NO ONE")){
+    trace+=2;
+    message("YOU CANNOT ESCAPE.");
+  }
+  if(buffer.includes("THEY WATCH")){
+    trace+=1;
+    message("SOMETHING IS HERE...");
+    freeze=20;
+  }
+
+  // Misc keys
+  if(e.key==="F") freeze=20;
+  if(e.key==="R") trace++;
+  if(e.shiftKey && e.key==="Enter") freeze=60;
+  if(e.ctrlKey && e.key==="t") trace=Math.max(0,trace-1);
+});
+</script>
+</body>
+</html>
